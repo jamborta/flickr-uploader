@@ -538,6 +538,23 @@ class Uploadr:
                     else:
                         file_id = int(str(res.getElementsByTagName('photoid')[0].firstChild.nodeValue))
 
+                    import mimetypes
+                    import time
+                    filetype = mimetypes.guess_type(file)
+                    if 'video' in filetype[0]:
+                        print ("Updating video date")
+                        video_date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_modified))
+                        try:
+                            res_set_date = flick.photos_set_dates(file_id, video_date)
+                            if res_set_date['stat'] == 'ok':
+                                print("Set date ok")
+                        except (IOError, ValueError, httplib.HTTPException):
+                            print(str(sys.exc_info()))
+                            print("Error setting date")
+                        if res_set_date['stat'] != 'ok':
+                            raise IOError(res_set_date)
+                        print("Successfully set date for pic number: " + str(file_id))
+
                     # Add to db
                     cur.execute(
                         'INSERT INTO files (files_id, path, md5, last_modified, tagged) VALUES (?, ?, ?, ?, 1)',
@@ -554,6 +571,19 @@ class Uploadr:
                     if (fileMd5 != str(row[4])):
                         self.replacePhoto(file, row[1], row[4], fileMd5, last_modified, cur, con);
             return success
+
+    def photos_set_dates(self, photo_id, datetxt):
+        data = {
+            "auth_token": str(self.token),
+            "perms": str(self.perms),
+            "format": "json",
+            "nojsoncallback": "1",
+            "method": "flickr.photos.setDates",
+            "photo_id": str(photo_id),
+            "date_taken": str(datetxt)
+        }
+        url = self.urlGen(api.rest, data, self.signCall(data))
+        return self.getResponse(url)
 
     def replacePhoto(self, file, file_id, oldFileMd5, fileMd5, last_modified, cur, con):
         success = False
